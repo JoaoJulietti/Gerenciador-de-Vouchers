@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestão de Vouchers por Cliente</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 20px;
+      padding: 30px;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+      color: #333;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    input:invalid {
+      border-color: red;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .form-row > div {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .btn-container {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 10px;
+      background-color: #272b2e;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #d5d82b;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 30px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border: 1px solid #ccc;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    th {
+      background-color: #ecf0f1;
+      font-weight: bold;
+      cursor: default;
+    }
+
+    tr.selected {
+      background-color: #d0e7ff;
+    }
+
+    #mensagem {
+      margin-top: 15px;
+      text-align: center;
+      font-weight: bold;
+      padding: 10px;
+      border-radius: 5px;
+      opacity: 0;
+      transition: opacity 0.6s;
+      user-select: none;
+    }
+
+    #mensagem.sucesso {
+      background-color: #27ae60;
+      color: white;
+      opacity: 1;
+    }
+
+    #mensagem.erro {
+      background-color: #c0392b;
+      color: white;
+      opacity: 1;
+    }
+
+    /* Modal */
+    #modalDeletar {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0; right: 0; bottom: 0;
+      background-color: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    #modalDeletar .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    #modalDeletar button {
+      width: 120px;
+      margin: 10px;
+    }
+
+    /* Paginação */
+    .paginacao {
+      margin-top: 15px;
+      text-align: center;
+    }
+    .paginacao button {
+      margin: 0 3px;
+      min-width: 40px;
+      font-weight: bold;
+    }
+    .paginacao button.active {
+      background-color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Gestão de Vouchers</h1>
+    <div class="form-row">
+      <div>
+        <label for="cliente">Cliente</label>
+        <input type="text" id="cliente" placeholder="Nome do cliente" required />
+      </div>
+      <div>
+        <label for="clienteSelect">Clientes Salvos</label>
+        <select id="clienteSelect" onchange="selecionarCliente()"></select>
+      </div>
+      <div>
+        <label for="limiteTotal">Limite Total Permitido</label>
+        <input type="number" id="limiteTotal" placeholder="Ex: 1000" min="0" required />
+      </div>
+    </div>
+
+    <div class="btn-container">
+      <button onclick="salvarClienteEdicao()">Salvar Cliente</button>
+      <button onclick="carregarCliente()">Carregar Cliente</button>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label for="numeroVoucher">Número do Voucher</label>
+        <input type="text" id="numeroVoucher" required />
+      </div>
+      <div>
+        <label for="limiteVoucher">Valor</label>
+        <input type="number" id="limiteVoucher" min="0" step="0.01" required />
+      </div>
+      <div>
+        <label for="dataVoucher">Data</label>
+        <input type="date" id="dataVoucher" required />
+      </div>
+      <div>
+        <label for="pedidoUtilizado">Pedido Utilizado</label>
+        <input type="text" id="pedidoUtilizado" placeholder="Número do pedido" required />
+      </div>
+    </div>
+
+    <div class="btn-container">
+      <button onclick="adicionar()">Adicionar</button>
+      <button onclick="editar()">Editar</button>
+      <button onclick="abrirModalDeletar()">Deletar</button>
+    </div>
+
+    <div class="form-row" style="margin-top:20px;">
+      <div style="flex: 2;">
+        <label for="buscaTabela">Buscar (voucher, pedido ou data)</label>
+        <input type="text" id="buscaTabela" oninput="filtrarTabela()" placeholder="Digite para filtrar" />
+      </div>
+    </div>
+
+    <p id="mensagem"></p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Cliente</th>
+          <th>Limite Total</th>
+          <th>Número</th>
+          <th>Valor</th>
+          <th>Data</th>
+          <th>Pedido Utilizado</th>
+        </tr>
+      </thead>
+      <tbody id="tabela"></tbody>
+    </table>
+    <div class="paginacao" id="paginacao"></div>
+  </div>
+
+  <!-- Modal deletar -->
+  <div id="modalDeletar">
+    <div class="modal-content">
+      <p>Tem certeza que deseja deletar o item selecionado?</p>
+      <button onclick="confirmarDeletar()">Sim</button>
+      <button onclick="fecharModalDeletar()">Não</button>
+    </div>
+  </div>
+
+  <!-- Bibliotecas para exportar -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+    let todosClientes = {};
+    let clienteAtual = null;
+    let dados = [];
+    let indiceEditar = -1;
+
+    // Para paginação e filtro
+    let itensPorPagina = 5;
+    let paginaAtual = 1;
+    let dadosFiltrados = [];
+
+    function mostrarMensagem(msg, tipo = "sucesso") {
+      const el = document.getElementById("mensagem");
+      el.textContent = msg;
+      el.className = tipo;
+      setTimeout(() => {
+        el.className = "";
+        el.textContent = "";
+      }, 4000);
+    }
+
+    function mostrarErro(msg) {
+      mostrarMensagem(msg, "erro");
+    }
+
+    function validarCamposObrigatorios(campos) {
+      for (const campo of campos) {
+        if (!campo.value || (campo.type === "number" && campo.value < 0)) {
+          mostrarErro(
+            "Todos os campos devem ser preenchidos corretamente e valores negativos não são permitidos."
+          );
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function limparCampos() {
+      document.getElementById("numeroVoucher").value = "";
+      document.getElementById("limiteVoucher").value = "";
+      document.getElementById("dataVoucher").value = "";
+      document.getElementById("pedidoUtilizado").value = "";
+      indiceEditar = -1;
+      atualizarTabela();
+    }
+
+    // Atualiza tabela de acordo com pagina atual e dados filtrados
+    function atualizarTabela() {
+      const tbody = document.getElementById("tabela");
+      tbody.innerHTML = "";
+      if (dadosFiltrados.length === 0) {
+        paginaAtual = 1;
+        dadosFiltrados = [...dados];
+      }
+
+      const inicio = (paginaAtual - 1) * itensPorPagina;
+      const fim = inicio + itensPorPagina;
+      const paginaDados = dadosFiltrados.slice(inicio, fim);
+
+      paginaDados.forEach((item, index) => {
+        const row = document.createElement("tr");
+
+        if (index + inicio === indiceEditar) {
+          row.classList.add("selected");
+        }
+
+        row.addEventListener("click", () => {
+          indiceEditar = index + inicio;
+          preencherCamposParaEdicao(indiceEditar);
+          atualizarTabela();
+        });
+
+        row.innerHTML = `
+          <td>${index + inicio + 1}</td>
+          <td>${clienteAtual || ""}</td>
+          <td>R$ ${document.getElementById("limiteTotal").value || 0}</td>
+          <td>${item.numero}</td>
+          <td>R$ ${item.limite.toFixed(2)}</td>
+          <td>${item.data}</td>
+          <td>${item.pedidoUtilizado}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      atualizarPaginacao();
+    }
+
+    function atualizarPaginacao() {
+      const pagDiv = document.getElementById("paginacao");
+      pagDiv.innerHTML = "";
+      const totalPaginas = Math.ceil(dadosFiltrados.length / itensPorPagina);
+      if (totalPaginas <= 1) return;
+
+      // Botão Anterior
+      const btnPrev = document.createElement("button");
+      btnPrev.textContent = "«";
+      btnPrev.disabled = paginaAtual === 1;
+      btnPrev.onclick = () => {
+        if (paginaAtual > 1) {
+          paginaAtual--;
+          atualizarTabela();
+        }
+      };
+      pagDiv.appendChild(btnPrev);
+
+      for (let i = 1; i <= totalPaginas; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        if (i === paginaAtual) btn.classList.add("active");
+        btn.onclick = () => {
+          paginaAtual = i;
+          atualizarTabela();
+        };
+        pagDiv.appendChild(btn);
+      }
+
+      // Botão Próximo
+      const btnNext = document.createElement("button");
+      btnNext.textContent = "»";
+      btnNext.disabled = paginaAtual === totalPaginas;
+      btnNext.onclick = () => {
+        if (paginaAtual < totalPaginas) {
+          paginaAtual++;
+          atualizarTabela();
+        }
+      };
+      pagDiv.appendChild(btnNext);
+    }
+
+    function preencherCamposParaEdicao(index) {
+      const item = dados[index];
+      document.getElementById("numeroVoucher").value = item.numero;
+      document.getElementById("limiteVoucher").value = item.limite;
+      document.getElementById("dataVoucher").value = item.data;
+      document.getElementById("pedidoUtilizado").value = item.pedidoUtilizado || "";
+    }
+
+    function adicionar() {
+      const cliente = document.getElementById("cliente");
+      const numero = document.getElementById("numeroVoucher");
+      const limite = document.getElementById("limiteVoucher");
+      const data = document.getElementById("dataVoucher");
+      const pedidoUtilizado = document.getElementById("pedidoUtilizado");
+      const limiteTotal = parseFloat(document.getElementById("limiteTotal").value);
+
+      if (
+        !validarCamposObrigatorios([cliente, numero, limite, data, pedidoUtilizado])
+      )
+        return;
+
+      const novoLimite = parseFloat(limite.value);
+      const totalSemEditar =
+        indiceEditar >= 0
+          ? dados.reduce(
+              (acc, item, idx) => (idx === indiceEditar ? acc : acc + item.limite),
+              0
+            )
+          : dados.reduce((acc, item) => acc + item.limite, 0);
+
+      if (totalSemEditar + novoLimite > limiteTotal) {
+        mostrarErro("Excede o limite total permitido.");
+        return;
+      }
+
+      if (indiceEditar >= 0) {
+        // editar existente
+        dados[indiceEditar] = {
+          numero: numero.value,
+          limite: novoLimite,
+          data: data.value,
+          pedidoUtilizado: pedidoUtilizado.value.trim(),
+        };
+        mostrarMensagem("Voucher editado com sucesso!");
+      } else {
+        // adicionar novo
+        dados.push({
+          numero: numero.value,
+          limite: novoLimite,
+          data: data.value,
+          pedidoUtilizado: pedidoUtilizado.value.trim(),
+        });
+        mostrarMensagem("Voucher adicionado com sucesso!");
+      }
+
+      salvarCliente(cliente.value);
+      limparCampos();
+      atualizarTabela();
+    }
+
+    function editar() {
+      if (indiceEditar < 0) {
+        mostrarErro("Selecione um item para editar.");
+        return;
+      }
+      adicionar(); // reutiliza a função adicionar para salvar edição
+    }
+
+    // Modal deleção
+    function abrirModalDeletar() {
+      if (indiceEditar < 0) {
+        mostrarErro("Selecione um item para deletar.");
+        return;
+      }
+      document.getElementById("modalDeletar").style.display = "flex";
+    }
+
+    function fecharModalDeletar() {
+      document.getElementById("modalDeletar").style.display = "none";
+    }
+
+    function confirmarDeletar() {
+      dados.splice(indiceEditar, 1);
+      salvarCliente(document.getElementById("cliente").value);
+      limparCampos();
+      atualizarTabela();
+      fecharModalDeletar();
+      mostrarMensagem("Voucher deletado com sucesso!");
+    }
+
+    // Salvar clientes no localStorage
+    function salvarClientesStorage() {
+      localStorage.setItem("todosClientes", JSON.stringify(todosClientes));
+    }
+
+    // Carregar clientes do localStorage
+    function carregarClientesStorage() {
+      const data = localStorage.getItem("todosClientes");
+      if (data) {
+        todosClientes = JSON.parse(data);
+      } else {
+        todosClientes = {};
+      }
+    }
+
+    // Atualizar select clientes
+    function atualizarSelectClientes() {
+      const select = document.getElementById("clienteSelect");
+      select.innerHTML = "";
+
+      // Opção vazia para ficar limpo e sem seleção automática
+      const opcaoVazia = document.createElement("option");
+      opcaoVazia.value = "";
+      opcaoVazia.textContent = "-- Selecione um cliente --";
+      select.appendChild(opcaoVazia);
+
+      for (const nome in todosClientes) {
+        const option = document.createElement("option");
+        option.value = nome;
+        option.textContent = nome;
+        select.appendChild(option);
+      }
+
+      // Garante que nenhuma opção fique selecionada automaticamente
+      select.value = "";
+    }
+
+    // Salvar cliente
+    function salvarCliente(nome) {
+      if (!nome) return;
+      todosClientes[nome] = {
+        limiteTotal: parseFloat(document.getElementById("limiteTotal").value),
+        dados: JSON.parse(JSON.stringify(dados)),
+      };
+      clienteAtual = nome;
+      atualizarSelectClientes();
+      salvarClientesStorage();
+    }
+
+    // Carregar cliente
+    function carregarCliente() {
+      const nome = document.getElementById("cliente").value.trim();
+      if (todosClientes[nome]) {
+        clienteAtual = nome;
+        dados = JSON.parse(JSON.stringify(todosClientes[nome].dados));
+        document.getElementById("limiteTotal").value = todosClientes[nome].limiteTotal;
+      } else {
+        dados = [];
+        clienteAtual = nome;
+        document.getElementById("limiteTotal").value = "";
+      }
+      limparCampos();
+      dadosFiltrados = [...dados];
+      paginaAtual = 1;
+      atualizarTabela();
+      mostrarMensagem("");
+      atualizarSelectClientes();
+    }
+
+    // Selecionar cliente no select
+    function selecionarCliente() {
+      const select = document.getElementById("clienteSelect");
+      document.getElementById("cliente").value = select.value;
+      carregarCliente();
+    }
+
+    // Filtro na tabela por texto
+    function filtrarTabela() {
+      const busca = document.getElementById("buscaTabela").value.toLowerCase();
+      dadosFiltrados = dados.filter(
+        (d) =>
+          d.numero.toLowerCase().includes(busca) ||
+          d.pedidoUtilizado.toLowerCase().includes(busca) ||
+          d.data.toLowerCase().includes(busca)
+      );
+      paginaAtual = 1;
+      indiceEditar = -1;
+      atualizarTabela();
+    }
+
+    // Exportar Excel
+    function exportarExcel() {
+      if (dados.length === 0) return alert("Nenhum dado para exportar.");
+
+      const ws = XLSX.utils.json_to_sheet(
+        dados.map((d) => ({
+          Cliente: clienteAtual,
+          "Limite Total": document.getElementById("limiteTotal").value || 0,
+          Número: d.numero,
+          Valor: d.limite,
+          Data: d.data,
+          "Pedido Utilizado": d.pedidoUtilizado,
+        }))
+      );
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Vouchers");
+      XLSX.writeFile(wb, `${clienteAtual || "cliente"}_vouchers.xlsx`);
+    }
+
+    // Exportar PDF (simples)
+    async function exportarPDF() {
+      if (dados.length === 0) return alert("Nenhum dado para exportar.");
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(18);
+      doc.text(`Vouchers - Cliente: ${clienteAtual}`, 10, 10);
+
+      doc.setFontSize(12);
+      let y = 20;
+
+      const colTitles = [
+        "#",
+        "Número",
+        "Valor",
+        "Data",
+        "Pedido Utilizado",
+      ];
+
+      doc.text(colTitles.join(" | "), 10, y);
+      y += 8;
+
+      dados.forEach((d, i) => {
+        const linha = [
+          (i + 1).toString(),
+          d.numero,
+          `R$ ${d.limite.toFixed(2)}`,
+          d.data,
+          d.pedidoUtilizado,
+        ].join(" | ");
+        doc.text(linha, 10, y);
+        y += 8;
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+
+      doc.save(`${clienteAtual || "cliente"}_vouchers.pdf`);
+    }
+
+    // Salvar cliente do input, atualizar dados
+    function salvarClienteEdicao() {
+      const cliente = document.getElementById("cliente").value.trim();
+      const limiteTotal = parseFloat(document.getElementById("limiteTotal").value);
+      if (!cliente) {
+        mostrarErro("Informe o nome do cliente.");
+        return;
+      }
+      if (isNaN(limiteTotal) || limiteTotal < 0) {
+        mostrarErro("Informe um limite total válido.");
+        return;
+      }
+      if (!todosClientes[cliente]) {
+        todosClientes[cliente] = { limiteTotal: limiteTotal, dados: [] };
+      } else {
+        todosClientes[cliente].limiteTotal = limiteTotal;
+      }
+      clienteAtual = cliente;
+      dados = JSON.parse(JSON.stringify(todosClientes[cliente].dados));
+      dadosFiltrados = [...dados];
+      paginaAtual = 1;
+      indiceEditar = -1;
+      limparCampos();
+      atualizarTabela();
+      atualizarSelectClientes();
+      salvarClientesStorage();
+      mostrarMensagem("Cliente salvo/atualizado com sucesso!");
+    }
+
+    // Inicialização
+    function init() {
+      carregarClientesStorage();
+      atualizarSelectClientes();
+      limparCampos();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
